@@ -1,0 +1,3 @@
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
+export default function Navbar() { const { user, logout } = useAuth(); const nav = useNavigate(); return <nav className="nav"><Link to="/" className="logo"><span className="logo-mark">✦</span>SkillNest</Link><div className="links"><Link to="/courses">Explore programs</Link>{user && <Link to="/dashboard">My learning</Link>}{user?.role === 'admin' && <Link to="/admin">Admin</Link>}{user ? <button className="btn alt" onClick={() => { logout(); nav('/'); }}>Log out</button> : <Link to="/auth" className="btn">Start learning →</Link>}</div></nav>; }
