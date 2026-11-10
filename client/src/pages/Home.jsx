@@ -1,2 +1,259 @@
-import { useEffect, useState } from 'react'; import { Link } from 'react-router-dom'; import api from '../api'; import CourseCard from '../components/CourseCard';
-export default function Home(){const[courses,setCourses]=useState([]);useEffect(()=>{api.get('/courses').then(r=>setCourses(r.data.slice(0,3))).catch(()=>{})},[]);const features=[['✦','Career-focused learning','Build real skills through concise, practical programs designed for the AI job market.'],['⌁','Flexible by design','Learn at your pace with clear paths that fit around your work and life.'],['↗','Learn with direction','Every program connects knowledge to a focused career outcome.']];const steps=[['01','Choose your direction','Explore paths built around emerging AI roles.'],['02','Start learning','Build practical skills through guided lessons.'],['03','Apply your skills','Turn learning into portfolio-ready work.'],['04','Track progress','Keep momentum from your learning space.'],['05','Grow your career','Put your new knowledge into action.']];return <><section className="wrap hero"><div><p className="eyebrow">Career-ready AI learning</p><h1>Build skills for the <span className="gradient-text">AI-powered future.</span></h1><p className="muted hero-copy">Practical learning paths for students and professionals ready to develop in-demand AI, data, and automation skills.</p><div className="row hero-actions"><Link className="btn" to="/courses">Explore programs →</Link><Link className="btn alt" to="/auth">Create free account</Link></div><div className="hero-proof"><span><b>✓</b> Hands-on learning</span><span><b>✓</b> Career-focused paths</span><span><b>✓</b> Learn at your pace</span></div></div><div className="hero-panel"><div className="panel-top"><span>YOUR LEARNING PATH</span><span>● ON TRACK</span></div><div className="path-card"><span className="tag">Generative AI</span><h3 style={{marginTop:12}}>AI Career Foundations</h3><div className="path-meta"><span>8 modules</span><span>•</span><span>Beginner</span></div><div className="progress"><i style={{width:'68%'}} /></div><p style={{fontSize:12,marginTop:8,color:'#667085'}}>68% complete · Keep going</p></div><div style={{position:'relative',zIndex:1,marginTop:22,fontSize:14,fontWeight:700}}>Your next skill is closer than you think. <span style={{color:'#fdba74'}}>→</span></div></div></section><section className="band"><div className="wrap"><div className="section-head"><div><p className="eyebrow" style={{color:'#fdba74'}}>Why SkillNest</p><h2>Learn with clarity. Grow with confidence.</h2></div></div><div className="feature-grid">{features.map(([i,t,d])=><article className="feature" key={t}><div className="feature-icon">{i}</div><h3>{t}</h3><p className="muted">{d}</p></article>)}</div></div></section><section className="wrap"><div className="section-head"><div><p className="eyebrow">Popular programs</p><h2>Start where the opportunity is.</h2><p className="muted">Explore practical courses built around skills employers are actively looking for.</p></div><Link className="text-link" to="/courses">View all programs →</Link></div><div className="grid">{courses.map(c=><CourseCard key={c._id} c={c}/>)}</div></section><section className="why"><div className="wrap"><div className="section-head"><div><p className="eyebrow">Your journey</p><h2>From curiosity to career-ready.</h2></div></div><div className="journey">{steps.map(([n,t,d])=><article className="journey-step" key={n}><b>{n}</b><h3>{t}</h3><p className="muted">{d}</p></article>)}</div></div></section><section className="wrap"><div className="section-head"><div><p className="eyebrow">Learner stories</p><h2>Built for real momentum.</h2></div></div><div className="testimonials">{[['RK','The structure made a complex subject feel achievable. I finally had a roadmap I could follow.','Rahul K. · Product professional'],['PM','I wanted practical AI skills, not theory. SkillNest helped me make meaningful progress quickly.','Priya M. · Analyst'],['AS','The learning path was clear, focused and genuinely useful for the projects I wanted to build.','Aman S. · Student']].map(([a,q,n])=><article className="card quote" key={a}><div className="stars">★★★★★</div><p>“{q}”</p><footer><span className="avatar">{a}</span>{n}</footer></article>)}</div></section><section className="band"><div className="wrap" style={{textAlign:'center',paddingTop:56,paddingBottom:56}}><p className="eyebrow" style={{justifyContent:'center',color:'#fdba74'}}>Your next chapter</p><h2 style={{fontSize:34,letterSpacing:-1.2,margin:'12px 0'}}>Ready to build skills that move you forward?</h2><p className="muted" style={{maxWidth:560,margin:'auto'}}>Find a learning path that turns your curiosity into practical, career-ready knowledge.</p><Link className="btn" style={{marginTop:24}} to="/courses">Explore SkillNest programs →</Link></div></section></>}
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
+import { errMsg } from '../api';
+import { courseApi } from '../lib/services';
+import { plural } from '../lib/format';
+import useDocumentTitle from '../hooks/useDocumentTitle';
+import Icon from '../components/Icon';
+import CourseGrid from '../components/CourseGrid';
+import EmptyState from '../components/EmptyState';
+import NetworkGraphic from '../components/NetworkGraphic';
+import { Skeleton } from '../components/SkeletonLoader';
+import { themeFor } from '../components/CourseVisual';
+
+const FEATURES = [
+  ['target', 'Practical, project-based', 'Every course is built around applying skills to realistic tasks, not just theory.'],
+  ['signal', 'Clear difficulty levels', 'Beginner, Intermediate and Advanced labels help you pick the right starting point.'],
+  ['cpu', 'Focused on AI & data', 'Generative AI, agents, automation and analytics — the skills shaping modern work.'],
+  ['checkCircle', 'Track your progress', 'Your dashboard keeps every enrollment organised, from first lesson to completion.'],
+];
+
+const STEPS = [
+  ['Explore', 'Search and filter courses by topic, level and price to find your fit.'],
+  ['Enroll', 'Join a course in one click and it appears instantly in My Learning.'],
+  ['Learn & build', 'Work through the curriculum and apply each concept to a real project.'],
+  ['Complete', 'Mark courses as completed and watch your progress summary grow.'],
+];
+
+// Illustrative only — clearly labelled on the page as sample feedback.
+const TESTIMONIALS = [
+  ['Ritika S.', 'Product analyst', 'The lessons were short and practical. I could apply the prompt-design ideas at work the same week.'],
+  ['Arjun M.', 'Final-year student', 'Having beginner and intermediate levels made it easy to know where to start and what to take next.'],
+  ['Meera K.', 'Operations associate', 'The automation course helped me map out which repetitive tasks were worth automating first.'],
+];
+
+function HeroVisual() {
+  return (
+    <div className="hero-visual" role="img" aria-label="Illustration of an AI learning workspace with a neural network diagram and project cards">
+      <div className="hv-card hv-main" aria-hidden="true">
+        <div className="hv-head">
+          <span className="hv-dots"><i /><i /><i /></span>
+          <span>AI learning workspace</span>
+        </div>
+        <NetworkGraphic />
+        <div className="hv-chips">
+          <span>Prompt design</span>
+          <span>Model evaluation</span>
+          <span>Automation</span>
+        </div>
+      </div>
+      <div className="hv-card hv-float hv-float-a" aria-hidden="true">
+        <span className="hv-float-icon"><Icon name="sparkles" size={20} /></span>
+        <div><strong>Hands-on project</strong><span>Build a working AI assistant</span></div>
+      </div>
+      <div className="hv-card hv-float hv-float-b" aria-hidden="true">
+        <span className="hv-float-icon"><Icon name="checkCircle" size={20} /></span>
+        <div><strong>Module complete</strong><span>Foundations of LLMs</span></div>
+      </div>
+    </div>
+  );
+}
+
+function SectionHead({ id, eyebrow, title, text, link }) {
+  return (
+    <div className="section-head">
+      <div>
+        <p className="eyebrow">{eyebrow}</p>
+        <h2 id={id} className="h-section">{title}</h2>
+        {text && <p className="muted">{text}</p>}
+      </div>
+      {link}
+    </div>
+  );
+}
+
+export default function Home() {
+  useDocumentTitle('');
+  const { user } = useAuth();
+  const [courses, setCourses] = useState(null);
+  const [categories, setCategories] = useState(null);
+  const [error, setError] = useState('');
+  const [reload, setReload] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setError('');
+    Promise.all([courseApi.list({ sort: 'newest' }), courseApi.categories()])
+      .then(([list, cats]) => {
+        if (!active) return;
+        setCourses(list.slice(0, 3));
+        setCategories(cats);
+      })
+      .catch((e) => {
+        if (!active) return;
+        setError(errMsg(e));
+        setCourses([]);
+        setCategories([]);
+      });
+    return () => { active = false; };
+  }, [reload]);
+
+  const startHref = user ? '/dashboard' : '/auth?mode=register';
+
+  return (
+    <>
+      <section className="hero" aria-labelledby="hero-title">
+        <div className="container hero-grid">
+          <div className="hero-copy">
+            <p className="eyebrow">Practical AI learning</p>
+            <h1 id="hero-title" className="h-display">
+              Build Your Future with <span className="mark">Practical AI Skills</span>
+            </h1>
+            <p className="lead">
+              Learn industry-relevant skills, build real-world projects and prepare for the opportunities shaping tomorrow.
+            </p>
+            <div className="hero-actions">
+              <Link className="btn btn-primary btn-lg" to="/courses">Explore Courses <Icon name="arrowRight" size={18} /></Link>
+              <Link className="btn btn-secondary btn-lg" to={startHref}>Start Learning</Link>
+            </div>
+            <ul className="hero-points" role="list">
+              <li><Icon name="check" size={18} />Project-based lessons</li>
+              <li><Icon name="check" size={18} />Beginner to advanced levels</li>
+              <li><Icon name="check" size={18} />Learn at your own pace</li>
+            </ul>
+          </div>
+          <HeroVisual />
+        </div>
+      </section>
+
+      <section className="section" aria-labelledby="categories-title">
+        <div className="container">
+          <SectionHead
+            id="categories-title"
+            eyebrow="Learning categories"
+            title="Explore by topic"
+            text="Pick a focus area and browse the courses available in it."
+            link={<Link className="text-link" to="/courses">Browse all courses <Icon name="arrowRight" size={16} /></Link>}
+          />
+          {categories === null ? (
+            <div className="category-grid" role="status" aria-busy="true">
+              <span className="sr-only">Loading categories…</span>
+              {[0, 1, 2].map((i) => <Skeleton key={i} style={{ height: 88, borderRadius: 18 }} />)}
+            </div>
+          ) : categories.length ? (
+            <ul className="category-grid" role="list">
+              {categories.map((cat) => {
+                const t = themeFor(cat.name);
+                return (
+                  <li key={cat.name}>
+                    <Link
+                      to={`/courses?category=${encodeURIComponent(cat.name)}`}
+                      className="card card-interactive category-card"
+                      style={{ '--cv-bg': t.bg, '--cv-accent': t.accent }}
+                    >
+                      <span className="category-icon" aria-hidden="true"><Icon name={t.icon} size={24} /></span>
+                      <span className="category-name">{cat.name}</span>
+                      <span className="category-count">{plural(cat.count, 'course')}</span>
+                      <Icon name="arrowRight" size={18} className="category-arrow" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <EmptyState icon="layers" title={error ? 'Categories are unavailable right now' : 'No categories yet'}>
+              {error || 'Categories will appear here once courses are published.'}
+            </EmptyState>
+          )}
+        </div>
+      </section>
+
+      <section className="section section-alt" aria-labelledby="popular-title">
+        <div className="container">
+          <SectionHead
+            id="popular-title"
+            eyebrow="Popular courses"
+            title="Start with our latest courses"
+            text="Recently published courses across AI, data and automation."
+            link={<Link className="text-link" to="/courses">View all courses <Icon name="arrowRight" size={16} /></Link>}
+          />
+          <CourseGrid
+            courses={courses}
+            loading={courses === null}
+            error={error}
+            onRetry={() => { setCourses(null); setCategories(null); setReload((n) => n + 1); }}
+            skeletonCount={3}
+            emptyTitle="No courses published yet"
+            emptyText="Check back soon — new courses are on the way."
+          />
+        </div>
+      </section>
+
+      <section className="section" aria-labelledby="why-title">
+        <div className="container">
+          <SectionHead id="why-title" eyebrow="Why SkillNest" title="Designed for learning that sticks" />
+          <ul className="feature-grid" role="list">
+            {FEATURES.map(([icon, title, text]) => (
+              <li key={title} className="card feature-card">
+                <span className="feature-icon" aria-hidden="true"><Icon name={icon} size={22} /></span>
+                <h3>{title}</h3>
+                <p className="muted">{text}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section className="section section-alt" aria-labelledby="journey-title">
+        <div className="container">
+          <SectionHead id="journey-title" eyebrow="Learning journey" title="From first click to completed course" />
+          <ol className="journey">
+            {STEPS.map(([title, text], i) => (
+              <li key={title} className="card journey-step">
+                <span className="journey-num" aria-hidden="true">{i + 1}</span>
+                <h3><span className="sr-only">Step {i + 1}: </span>{title}</h3>
+                <p className="muted">{text}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <section className="section" aria-labelledby="stories-title">
+        <div className="container">
+          <SectionHead id="stories-title" eyebrow="Learner stories" title="What learners value" />
+          <ul className="testimonial-grid" role="list">
+            {TESTIMONIALS.map(([name, role, quote]) => (
+              <li key={name}>
+                <figure className="card testimonial">
+                  <span className="testimonial-mark" aria-hidden="true">“</span>
+                  <blockquote><p>{quote}</p></blockquote>
+                  <figcaption>
+                    <span className="avatar" aria-hidden="true">{name[0]}</span>
+                    <span><strong>{name}</strong><span className="muted">{role}</span></span>
+                  </figcaption>
+                </figure>
+              </li>
+            ))}
+          </ul>
+          <p className="sample-note"><Icon name="info" size={16} />Sample testimonials shown for demonstration purposes.</p>
+        </div>
+      </section>
+
+      <section className="section" aria-labelledby="cta-title" style={{ paddingTop: 0 }}>
+        <div className="container">
+          <div className="cta-band">
+            <p className="eyebrow">Your next step</p>
+            <h2 id="cta-title">Ready to start building practical AI skills?</h2>
+            <p>Browse the catalogue, enroll in a course and track your progress from your personal dashboard.</p>
+            <div className="cta-actions">
+              <Link className="btn btn-primary btn-lg" to="/courses">Explore Courses <Icon name="arrowRight" size={18} /></Link>
+              <Link className="btn btn-secondary btn-lg" to={startHref}>{user ? 'Go to My Learning' : 'Create a free account'}</Link>
+            </div>
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}

@@ -1,2 +1,35 @@
+import { memo } from 'react';
 import { Link } from 'react-router-dom';
-export default function CourseCard({ c }) { return <article className="card">{c.thumbnail ? <img className="course-image" src={c.thumbnail} alt={`${c.title} course`} loading="lazy" /> : <div className="ph" />}<div className="course-content"><div className="tags"><span className="tag">{c.category}</span><span className="tag dark">{c.level}</span></div><h3>{c.title}</h3><p className="muted clamp desc">{c.description}</p><p className="muted" style={{fontSize:12}}>By {c.instructor} · {c.duration}</p><div className="course-footer"><strong>₹{c.price}</strong><Link className="text-link" to={`/courses/${c._id}`}>View program →</Link></div></div></article>; }
+import Icon from './Icon';
+import { Badge } from './StatusBadge';
+import { CourseMedia } from './CourseVisual';
+import { formatPrice } from '../lib/format';
+
+function CourseCard({ course: c, headingLevel = 3 }) {
+  const Heading = `h${headingLevel}`;
+  return (
+    <article className="card card-interactive course-card">
+      <CourseMedia course={c} className="course-card-media" />
+      <div className="course-card-body">
+        <div className="course-card-top">
+          <Badge tone="coral">{c.category}</Badge>
+          <span className="level-chip"><Icon name="signal" size={14} />{c.level}</span>
+        </div>
+        <Heading className="course-card-title">{c.title}</Heading>
+        <p className="course-card-desc">{c.description}</p>
+        <ul className="course-meta" role="list">
+          <li><Icon name="user" size={16} /><span className="sr-only">Instructor: </span>{c.instructor}</li>
+          <li><Icon name="clock" size={16} /><span className="sr-only">Duration: </span>{c.duration}</li>
+        </ul>
+        <div className="course-card-footer">
+          <p className="price"><span className="sr-only">Price: </span>{formatPrice(c.price)}</p>
+          <Link className="btn btn-secondary btn-sm" to={`/courses/${c._id}`} aria-label={`View Course: ${c.title}`}>
+            View Course <Icon name="arrowRight" size={16} />
+          </Link>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+export default memo(CourseCard);

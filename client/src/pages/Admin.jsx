@@ -1,4 +1,90 @@
-import {useEffect,useState} from 'react'; import api,{errMsg} from '../api';
-const EMPTY={title:'',description:'',instructor:'',category:'Generative AI',duration:'',level:'Beginner',price:'',thumbnail:''};
-export default function Admin(){const[tab,setTab]=useState('courses'),[courses,setCourses]=useState([]),[users,setUsers]=useState([]),[enr,setEnr]=useState([]),[form,setForm]=useState(EMPTY),[editId,setEditId]=useState(),[err,setErr]=useState('');const load=()=>Promise.all([api.get('/courses'),api.get('/users'),api.get('/enrollments')]).then(([c,u,e])=>{setCourses(c.data);setUsers(u.data);setEnr(e.data)}).catch(x=>setErr(errMsg(x)));useEffect(()=>{load()},[]);const set=k=>e=>setForm({...form,[k]:e.target.value});const save=async e=>{e.preventDefault();setErr('');try{const body={...form,price:Number(form.price)};editId?await api.put(`/courses/${editId}`,body):await api.post('/courses',body);setForm(EMPTY);setEditId();load()}catch(x){setErr(errMsg(x))}};const edit=c=>{setEditId(c._id);setForm({...EMPTY,...c});window.scrollTo({top:0,behavior:'smooth'})};const del=async c=>{if(window.confirm(`Delete "${c.title}"?`)){try{await api.delete(`/courses/${c._id}`);load()}catch(x){setErr(errMsg(x))}}};const F=(k,l,type='text')=><div className="form-group"><label htmlFor={k}>{l}</label><input id={k} type={type} className="input" required={k!=='thumbnail'} value={form[k]} onChange={set(k)}/></div>;const date=d=>d?new Date(d).toLocaleDateString():'—';return <main className="dashboard"><aside className="side-nav"><h3>ADMIN CONSOLE</h3>{['courses','users','enrollments'].map(t=><button className={tab===t?'active':''} onClick={()=>setTab(t)} key={t}>{t[0].toUpperCase()+t.slice(1)}</button>)}</aside><section className="dash-main"><header className="dash-title"><p className="eyebrow">Admin dashboard</p><h1>Manage your learning platform.</h1><p className="muted">Keep programs, learners, and enrollment activity organized.</p></header><div className="stats"><article className="card stat"><span className="stat-icon">▣</span><p>Total programs</p><strong>{courses.length}</strong></article><article className="card stat"><span className="stat-icon">◉</span><p>Total learners</p><strong>{users.length}</strong></article><article className="card stat"><span className="stat-icon">↗</span><p>Total enrollments</p><strong>{enr.length}</strong></article></div>{err&&<p className="err" role="alert">{err}</p>}{tab==='courses'&&<><form className="card admin-form" onSubmit={save}><div className="section-head"><h2>{editId?'Edit program':'Add a new program'}</h2>{editId&&<button type="button" className="btn alt" onClick={()=>{setEditId();setForm(EMPTY)}}>Cancel edit</button>}</div><div className="form-grid">{F('title','Program title')}{F('instructor','Instructor')}{F('category','Category')}{F('duration','Duration')}{F('price','Price (₹)','number')}{F('thumbnail','Thumbnail URL')}<div className="form-group"><label htmlFor="level">Level</label><select id="level" className="input" value={form.level} onChange={set('level')}><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select></div></div><div className="form-group"><label htmlFor="description">Description</label><textarea id="description" className="input" rows="3" required value={form.description} onChange={set('description')}/></div><button className="btn" style={{marginTop:16}}>{editId?'Update program':'Add program'}</button></form><Table heads={['Program','Category','Instructor','Price','Actions']}><tbody>{courses.map(c=><tr key={c._id}><td><b>{c.title}</b></td><td>{c.category}</td><td>{c.instructor}</td><td>₹{c.price}</td><td><div className="row"><button className="btn alt" onClick={()=>edit(c)}>Edit</button><button className="btn alt danger" onClick={()=>del(c)}>Delete</button></div></td></tr>)}</tbody></Table></>}{tab==='users'&&<Table heads={['Learner','Email','Role','Joined']}><tbody>{users.map(u=><tr key={u._id}><td><b>{u.name}</b></td><td>{u.email}</td><td><span className="tag dark">{u.role}</span></td><td>{date(u.createdAt)}</td></tr>)}</tbody></Table>}{tab==='enrollments'&&<Table heads={['Learner','Program','Enrolled','Status']}><tbody>{enr.map(e=><tr key={e._id}><td><b>{e.user?.name||'—'}</b><br/><span className="muted">{e.user?.email}</span></td><td>{e.course?.title||'—'}</td><td>{date(e.createdAt)}</td><td><span className="tag ok">{e.status}</span></td></tr>)}</tbody></Table>}</section></main>}
-function Table({heads,children}){return <div className="card data-card scroll"><table><thead><tr>{heads.map(h=><th key={h}>{h}</th>)}</tr></thead>{children}</table></div>}
+import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { errMsg } from '../api';
+import { courseApi, enrollmentApi, statsApi, userApi } from '../lib/services';
+import useDocumentTitle from '../hooks/useDocumentTitle';
+import Sidebar from '../components/Sidebar';
+import OverviewPanel from '../components/admin/OverviewPanel';
+import CoursesPanel from '../components/admin/CoursesPanel';
+import UsersPanel from '../components/admin/UsersPanel';
+import EnrollmentsPanel from '../components/admin/EnrollmentsPanel';
+
+const TABS = [
+  { key: 'overview', label: 'Overview', icon: 'grid', title: 'Platform overview', text: 'Key numbers and enrollment activity across SkillNest.' },
+  { key: 'courses', label: 'Courses', icon: 'bookOpen', title: 'Course management', text: 'Add, edit and remove courses in the catalogue.' },
+  { key: 'users', label: 'Users', icon: 'users', title: 'User management', text: 'Everyone with a SkillNest account.' },
+  { key: 'enrollments', label: 'Enrollments', icon: 'layers', title: 'Enrollment management', text: 'Who is enrolled in what, and their status.' },
+];
+
+const FETCHERS = {
+  stats: statsApi.get,
+  courses: () => courseApi.list(),
+  users: userApi.all,
+  enrollments: enrollmentApi.all,
+};
+const ALL = Object.keys(FETCHERS);
+
+export default function Admin() {
+  const [params] = useSearchParams();
+  const current = TABS.find((t) => t.key === params.get('tab')) || TABS[0];
+  useDocumentTitle(`Admin · ${current.label}`);
+
+  const [data, setData] = useState({ stats: null, courses: null, users: null, enrollments: null });
+  const [errors, setErrors] = useState({});
+
+  // Reload only the resources affected by an action; each one fails independently.
+  const load = useCallback(async (keys = ALL) => {
+    setErrors((prev) => ({ ...prev, ...Object.fromEntries(keys.map((k) => [k, null])) }));
+    const results = await Promise.allSettled(keys.map((k) => FETCHERS[k]()));
+    setData((prev) => {
+      const next = { ...prev };
+      results.forEach((r, i) => { if (r.status === 'fulfilled') next[keys[i]] = r.value; });
+      return next;
+    });
+    setErrors((prev) => {
+      const next = { ...prev };
+      results.forEach((r, i) => { next[keys[i]] = r.status === 'rejected' ? errMsg(r.reason) : null; });
+      return next;
+    });
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const counts = { courses: data.courses?.length, users: data.users?.length, enrollments: data.enrollments?.length };
+  const items = TABS.map((t) => ({
+    key: t.key, label: t.label, icon: t.icon, to: `/admin?tab=${t.key}`, active: t.key === current.key, count: counts[t.key],
+  }));
+
+  return (
+    <div className="container app-shell">
+      <Sidebar label="Admin sections" title="Admin console" items={items} />
+      <div className="app-main">
+        <header className="page-head">
+          <div>
+            <p className="eyebrow">Admin dashboard</p>
+            <h1 className="page-title">{current.title}</h1>
+            <p className="muted">{current.text}</p>
+          </div>
+        </header>
+
+        {current.key === 'overview' && (
+          <OverviewPanel stats={data.stats} enrollments={data.enrollments} error={errors.stats} onRetry={() => load(['stats', 'enrollments'])} />
+        )}
+        {current.key === 'courses' && (
+          <CoursesPanel
+            courses={data.courses}
+            stats={data.stats}
+            error={errors.courses}
+            onRetry={() => load(['courses'])}
+            onChanged={() => load(['courses', 'stats', 'enrollments'])}
+          />
+        )}
+        {current.key === 'users' && (
+          <UsersPanel users={data.users} enrollments={data.enrollments} error={errors.users} onRetry={() => load(['users', 'enrollments'])} />
+        )}
+        {current.key === 'enrollments' && (
+          <EnrollmentsPanel enrollments={data.enrollments} error={errors.enrollments} onRetry={() => load(['enrollments'])} />
+        )}
+      </div>
+    </div>
+  );
+}
