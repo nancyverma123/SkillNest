@@ -35,7 +35,7 @@ export default function About() {
         <div className="container about-grid">
           <div className="about-copy">
             <p className="eyebrow">Our mission</p>
-            <h2 id="mission-title">Make practical AI skills approachable</h2>
+            <h2 id="mission-title">Make practical AI skills <span className="accent-serif">approachable</span></h2>
             <p className="muted">
               New tools appear every month, and it can be hard to know what is worth learning. SkillNest curates focused
               courses that explain the essentials and show how to apply them to real tasks.
@@ -61,7 +61,7 @@ export default function About() {
           <div className="section-head">
             <div>
               <p className="eyebrow">What you'll find</p>
-              <h2 id="offer-title" className="h-section">Everything you need to learn with direction</h2>
+              <h2 id="offer-title" className="h-section">Everything you need to learn with <span className="accent-serif">direction</span></h2>
             </div>
           </div>
           <ul className="feature-grid" role="list" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
@@ -78,9 +78,9 @@ export default function About() {
 
       <section className="section" aria-labelledby="about-cta">
         <div className="container">
-          <div className="cta-band">
+          <div className="dark-panel cta-band">
             <p className="eyebrow">Get started</p>
-            <h2 id="about-cta">Find the right course for your next step</h2>
+            <h2 id="about-cta">Find the right course for your <span className="accent-serif">next step</span></h2>
             <div className="cta-actions">
               <Link className="btn btn-primary btn-lg" to="/courses">Explore Courses <Icon name="arrowRight" size={18} /></Link>
             </div>

@@ -94,10 +94,10 @@ export default function Auth() {
   const isLogin = mode === 'login';
   return (
     <div className="auth-page">
-      <aside className="auth-aside" aria-label="About SkillNest">
+      <aside className="dark-panel auth-aside" aria-label="About SkillNest">
         <div className="auth-aside-inner">
           <p className="eyebrow">SkillNest learning</p>
-          <h2>Turn curiosity into practical, career-ready skills.</h2>
+          <h2>Turn curiosity into <span className="accent-serif">career-ready</span> skills.</h2>
           <p>Join a focused learning space for the AI, data and automation skills shaping tomorrow's work.</p>
           <ul className="auth-points" role="list">
             <li><span aria-hidden="true"><Icon name="target" size={18} /></span>Project-based courses with clear outcomes</li>

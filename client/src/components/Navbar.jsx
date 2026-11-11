@@ -21,7 +21,7 @@ export function Brand() {
 }
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -53,7 +53,8 @@ export default function Navbar() {
     ...(user?.role === 'admin' ? [{ to: '/admin', label: 'Admin' }] : []),
   ].map((l) => <NavLink key={l.to} to={l.to} end={l.end} className="nav-link">{l.label}</NavLink>);
 
-  const actions = user ? (
+  // While the session is being checked (always true for the server render), show no account actions.
+  const actions = loading ? null : user ? (
     <>
       <span className="user-chip">
         <span className="avatar avatar-sm" aria-hidden="true">{initials(user.name)}</span>

@@ -6,10 +6,12 @@ export const useAuth = () => useContext(Ctx);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(() => Boolean(localStorage.getItem('token')));
+  // The token lives in localStorage, which the server can't read. Both the server render and the
+  // first browser render therefore start as "checking session", so the HTML matches on hydration.
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!localStorage.getItem('token')) return;
+    if (!localStorage.getItem('token')) { setLoading(false); return; }
     // An invalid token is cleared by the 401 interceptor; network errors keep it for the next visit.
     api.get('/auth/me').then((r) => setUser(r.data.user)).catch(() => {}).finally(() => setLoading(false));
   }, []);

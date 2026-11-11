@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { errMsg } from '../api';
 import { courseApi, enrollmentApi } from '../lib/services';
 import { formatDate, formatPrice, initials } from '../lib/format';
+import { KEYS, useInitialData } from '../lib/initialData';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 import { useToast } from '../components/Toast';
 import Icon from '../components/Icon';
@@ -41,15 +42,22 @@ export default function CourseDetail() {
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  const [course, setCourse] = useState(null);
-  const [state, setState] = useState('loading'); // loading | ready | notfound | error
+  // The SSR server may already have fetched this course (null = it does not exist).
+  const initial = useInitialData(KEYS.course(id));
+  const [course, setCourse] = useState(() => initial?.value ?? null);
+  const [state, setState] = useState(() => (!initial ? 'loading' : initial.value ? 'ready' : 'notfound')); // loading | ready | notfound | error
   const [error, setError] = useState('');
   const [reload, setReload] = useState(0);
   const [enrollment, setEnrollment] = useState(null);
   const [enrolling, setEnrolling] = useState(false);
-  useDocumentTitle(course?.title || (state === 'notfound' ? 'Course not found' : 'Course details'));
+  const skipKey = useRef(initial ? `${id}#0` : null);
+  useDocumentTitle(
+    course?.title || (state === 'notfound' ? 'Course not found' : 'Course details'),
+    course?.description
+  );
 
   useEffect(() => {
+    if (skipKey.current === `${id}#${reload}`) return undefined;
     let active = true;
     setState('loading');
     setCourse(null);

@@ -2,13 +2,11 @@
 
 SkillNest is a full-stack MERN learning platform. Students discover courses in generative AI, agentic AI, automation and analytics, enroll, and track their progress from a dashboard. Admins manage the catalogue, users and enrollments from an admin console with live statistics.
 
-**Stack:** React 18 (Vite) · React Router 6 · Node.js · Express 4 · MongoDB (Mongoose 8) · JWT · bcrypt
+**Stack:** React 18 with server-side rendering (Vite SSR + Express) · React Router 6 · Node.js · Express 4 · MongoDB (Mongoose 8) · JWT · bcrypt · deployed on Railway
 
 ## Live links (fill in after deploying)
-- App: [YOUR VERCEL URL]
-- API health check: [YOUR RENDER URL]/api/health
-
-> The backend runs on a free tier and may take ~30–50 seconds to wake up on the first request. The client waits up to 60 seconds before showing a timeout message.
+- App: [YOUR RAILWAY WEB URL]
+- API health check: [YOUR RAILWAY API URL]/api/health
 
 ---
 
@@ -27,6 +25,7 @@ SkillNest is a full-stack MERN learning platform. Students discover courses in g
 - Enrollment management: search by learner or course, filter by status
 
 **Quality**
+- Server-side rendering: public pages (home, course list, course detail) arrive as complete HTML with real course data, a per-page `<title>` and meta description, and a real 404 status for missing courses — then hydrate into the interactive app
 - Global toast notifications (`aria-live`), skeleton loaders, empty and error states with retry
 - WCAG-minded accessibility: skip link, visible focus rings, semantic landmarks, labelled form fields with linked error messages, `aria-current` navigation, keyboard-accessible dialogs with focus trapping and focus return, reduced-motion support, 44 px minimum touch targets, colour contrast ≥ 4.5:1
 - Responsive from 360 px upwards; tables scroll inside their own container, never the page
@@ -36,6 +35,7 @@ SkillNest is a full-stack MERN learning platform. Students discover courses in g
 | Layer | Technology |
 |---|---|
 | Frontend | React 18, Vite 5, React Router 6, Axios |
+| Web server (SSR) | Express 4 + Vite SSR (`client/server.js`), `compression` |
 | Backend | Node.js (≥ 18), Express 4, Mongoose 8 |
 | Database | MongoDB (Atlas in production) |
 | Auth | JSON Web Tokens (`jsonwebtoken`), `bcryptjs` |
@@ -50,21 +50,29 @@ SkillNest is a full-stack MERN learning platform. Students discover courses in g
 | `express-rate-limit` | server dependency | Limits login/register attempts per IP to slow password guessing and account spam |
 | `mongodb-memory-server` | server **dev** dependency | Spins up a throwaway MongoDB 7 in memory so tests never touch a real database |
 
-No frontend packages were added. Icons are an inline SVG set, and the chart uses CSS.
+| `express` | client dependency | Runs the SSR web server that renders React pages to HTML |
+| `compression` | client dependency | Gzips HTML, JS and CSS from the web server |
+
+No UI libraries were added. Icons are an inline SVG set, and the chart uses CSS.
 
 ## 3. Folder structure
 
 ```
 skillnest/
-├── client/                      React + Vite frontend
-│   ├── index.html
+├── client/                      React frontend + SSR web server (Railway service "web")
+│   ├── server.js                Express SSR server (dev: Vite middleware, prod: built bundles)
+│   ├── railway.json             Railway build/deploy config for the web service
+│   ├── index.html               HTML template with <!--app-html--> / <!--app-data--> slots
 │   └── src/
-│       ├── main.jsx             Router, ToastProvider, AuthProvider
+│       ├── entry-client.jsx     Browser entry: hydrates the server HTML
+│       ├── entry-server.jsx     SSR entry: loads route data, renders to HTML
+│       ├── Root.jsx             Providers shared by both entries
+│       ├── ssr/loaders.js       Server-side data loading for public pages
 │       ├── App.jsx              Routes, skip link, focus management on navigation
 │       ├── api.js               Axios instance, auth header, 401 handling, errMsg()
 │       ├── AuthContext.jsx      Current user, login/register/logout
 │       ├── styles.css           Design system: tokens, components, pages
-│       ├── lib/                 services.js (all API calls), format.js (price/date helpers)
+│       ├── lib/                 services.js (all API calls), format.js, initialData.jsx (SSR data hand-off)
 │       ├── hooks/               useDocumentTitle, useDebouncedValue
 │       ├── components/          Reusable UI (Navbar, Footer, Sidebar, CourseCard, CourseGrid,
 │       │   │                    SearchBar, FilterPanel, Toast, ConfirmModal, SkeletonLoader,
@@ -72,7 +80,8 @@ skillnest/
 │       │   │                    BarChart, FormField, Icon, CourseVisual, …)
 │       │   └── admin/           OverviewPanel, CoursesPanel, CourseForm, UsersPanel, EnrollmentsPanel
 │       └── pages/               Home, About, Courses, CourseDetail, Auth, Dashboard, Admin
-└── server/                      Express API
+└── server/                      Express API (Railway service "api")
+    ├── railway.json             Railway deploy config for the API service
     ├── server.js                App setup (helmet, CORS, JSON, routes, errors); exports app
     ├── config/db.js             MongoDB connection
     ├── middleware/              auth (protect/adminOnly), validate, rateLimit, error
@@ -84,7 +93,7 @@ skillnest/
     └── tests/                   api.test.js (integration tests), memory-server.js (UI testing)
 ```
 
-**Why this structure?** The frontend and backend are separate deployable apps (Vercel and Render), so each has its own `package.json` and environment. On the server, routes stay thin, while cross-cutting concerns (auth, validation, rate limiting, errors) live in middleware and are reused across routes. On the client, every HTTP call goes through `lib/services.js`, so pages never duplicate request logic. Small, presentational components in `components/` keep the pages readable and the design consistent.
+**Why this structure?** The web server and the API are separate Railway services from one repository, so each has its own `package.json`, environment and scaling. On the server, routes stay thin, while cross-cutting concerns (auth, validation, rate limiting, errors) live in middleware and are reused across routes. On the client, every HTTP call goes through `lib/services.js`, so pages never duplicate request logic. Small, presentational components in `components/` keep the pages readable and the design consistent.
 
 ## 4. Installation
 
@@ -106,9 +115,15 @@ npm run dev                 # http://localhost:5000/api/health
 ### Frontend setup (new terminal)
 ```bash
 cd client
-cp .env.example .env        # VITE_API_URL=http://localhost:5000/api
+cp .env.example .env        # VITE_API_URL and API_URL = http://localhost:5000/api
 npm install
-npm run dev                 # http://localhost:5173
+npm run dev                 # SSR dev server with hot reload: http://localhost:5173
+```
+
+Production build of the web app:
+```bash
+npm run build               # dist/client (browser assets) + dist/server (SSR bundle)
+npm start                   # production SSR server
 ```
 
 ## 5. Environment variables
@@ -121,14 +136,16 @@ npm run dev                 # http://localhost:5173
 | `JWT_SECRET` | yes | Long random string used to sign tokens |
 | `CLIENT_URL` | yes | Allowed CORS origin(s), comma-separated |
 | `PORT` | no | Defaults to 5000 |
-| `TRUST_PROXY` | no | Number of proxies in front of the API (default 1, correct for Render). Set 0 when running directly |
+| `TRUST_PROXY` | no | Number of proxies in front of the API (default 1, correct for Railway). Set 0 when running directly |
 | `AUTH_RATE_LIMIT_MAX` | no | Login/register attempts per IP per 15 minutes (default 20) |
 
 **client/.env**
 
-| Variable | Description |
-|---|---|
-| `VITE_API_URL` | Base URL of the API, e.g. `http://localhost:5000/api` |
+| Variable | When | Description |
+|---|---|---|
+| `VITE_API_URL` | build time | API URL used **by the browser** (must be the API's public URL), e.g. `http://localhost:5000/api` |
+| `API_URL` | runtime | API URL used **by the SSR server** to pre-load page data. On Railway use the private network URL. Defaults to `VITE_API_URL` |
+| `PORT` | runtime | Web server port (Railway sets it; defaults to 5173) |
 
 Never commit `.env` files. Both are already in `.gitignore`.
 
@@ -230,10 +247,11 @@ A complete **Postman collection** is in [`SkillNest.postman_collection.json`](Sk
 ## 9. Design decisions
 
 - **Enrollment uniqueness** is enforced by a unique compound index on `{ user, course }` in MongoDB, not just by an application check. This guarantees there are no duplicates even under concurrent requests (a double-click or two tabs). The duplicate-key error is translated into a friendly `409`.
-- **Design system:** colour, type, spacing, radius and shadow tokens live as CSS variables in `styles.css`. The brand palette is primary `#D93526`, secondary `#F97316`, page `#FEF6F6`, ink `#0F172A`, and Poppins type. Cards use 2 px ink borders with an offset shadow.
+- **Design system:** colour, type, spacing, radius and shadow tokens live as CSS variables in `styles.css`. The brand palette is primary `#D93526`, secondary `#F97316`, page `#FEF6F6`, ink `#0F172A`, and Poppins type. Cards use hairline borders and soft shadows; dark feature panels, mono labels and a serif-italic accent word add hierarchy.
 - **Contrast-driven choices:** white text on the orange CTA gradient measures only 2.8:1, so gradient buttons use ink text (4.9–6.4:1). Small red text uses `#B42318` (6.2:1 on the page background). `#D93526` is kept for accents and borders.
 - **Honest content:** progress is calculated from real enrollment status, sample testimonials are labelled as samples, and courses without published outcomes or curriculum say so rather than showing filler.
 - **Course imagery:** seeded courses used random placeholder photos. These are replaced with category illustrations generated in SVG. Admin-provided image URLs still display, and they fall back to the illustration if the image fails to load.
+- **Server-side rendering:** the SSR server fetches public data (courses, categories, course detail) over Railway's private network and embeds it as `window.__INITIAL_DATA__` (escaped against `</script>` injection) so the browser hydrates without re-fetching or flicker. If the API is slow (4 s timeout) the page still renders and the browser loads the data itself; if rendering fails entirely the server sends the client-rendered shell, so the site stays up. Because the JWT lives in `localStorage` (unchanged auth behaviour), the server cannot see who is logged in: account-specific pages render a "checking session" state on the server and complete in the browser.
 - **No extra state library:** React context covers auth and toasts. All other state is local to the page that owns it.
 
 ## 10. Testing
@@ -247,9 +265,9 @@ The suite (32 integration tests) starts a temporary **in-memory MongoDB 7** with
 To click through the UI without touching your real database:
 ```bash
 cd server && npm run dev:memory                     # API on :5055, sample data, in memory
-cd client && VITE_API_URL=http://localhost:5055/api npx vite --port 5174
+cd client && VITE_API_URL=http://localhost:5055/api API_URL=http://localhost:5055/api PORT=5174 npm run dev
 ```
-(On Windows PowerShell: `$env:VITE_API_URL="http://localhost:5055/api"; npx vite --port 5174`)
+(On Windows PowerShell: `$env:VITE_API_URL="http://localhost:5055/api"; $env:API_URL=$env:VITE_API_URL; $env:PORT="5174"; npm run dev`)
 
 ## 11. Test credentials
 
@@ -260,18 +278,43 @@ These accounts exist only in databases created with `npm run seed:reset` or `npm
 | Admin | admin@skillnest.com | Admin@123 |
 | Student | student@skillnest.com | Student@123 |
 
-## 12. Deployment
+## 12. Deployment (Railway)
 
-**Backend (Render, or any Node host)**
-1. Create a Web Service from the `server/` directory. Build command `npm install`, start command `npm start`.
-2. Set `MONGO_URI`, `JWT_SECRET` (a long random value), `CLIENT_URL` (your frontend URL), and optionally `TRUST_PROXY=1` and `AUTH_RATE_LIMIT_MAX`.
-3. In MongoDB Atlas, allow the host's outbound IPs in Network Access.
-4. Check `https://<your-api>/api/health`.
+Deploy the repository as **two services in one Railway project**. Each service builds only its own folder.
 
-**Frontend (Vercel)**
-1. Import the repo with root directory `client/`, framework preset Vite.
-2. Set `VITE_API_URL=https://<your-api>/api`.
-3. `client/vercel.json` already rewrites all routes to `index.html` for client-side routing.
+| | Service `api` | Service `web` |
+|---|---|---|
+| Settings → Source → Root Directory | `/server` | `/client` |
+| Settings → Config-as-code file path | `/server/railway.json` | `/client/railway.json` |
+| Build | `npm install` (auto) | `npm run build` (from `railway.json`) |
+| Start | `npm start` | `npm start` (production SSR) |
+| Health check | `/api/health` | `/health` |
+| Public domain | Generate one (the browser calls it) | Generate one (your site URL) |
+
+Railway does not read `railway.json` from the root directory automatically, so set the config file path in each service's settings.
+
+**Variables — `api` service**
+
+| Variable | Value |
+|---|---|
+| `MONGO_URI` | your Atlas connection string |
+| `JWT_SECRET` | a long random value |
+| `CLIENT_URL` | `https://${{web.RAILWAY_PUBLIC_DOMAIN}}` (plus any custom domain, comma-separated) |
+| `PORT` | `5000` (lets the web service reference it) |
+| `TRUST_PROXY` | `1` |
+
+**Variables — `web` service**
+
+| Variable | Value |
+|---|---|
+| `VITE_API_URL` | `https://${{api.RAILWAY_PUBLIC_DOMAIN}}/api` — used by browsers, baked in at build time |
+| `API_URL` | `http://${{api.RAILWAY_PRIVATE_DOMAIN}}:${{api.PORT}}/api` — SSR data loading over the private network |
+
+Notes:
+- `VITE_API_URL` is read at **build** time; after changing it, redeploy the `web` service.
+- In MongoDB Atlas → Network Access, allow connections from Railway (Railway's static outbound IPs, if enabled, or `0.0.0.0/0` with a strong database password).
+- Verify with `https://<api-domain>/api/health` and by viewing the page source of `https://<web-domain>/courses` — the course titles should be in the HTML.
+- Never run `npm run seed:reset` against the production database.
 
 ## 13. Manual test checklist
 

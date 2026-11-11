@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { errMsg } from '../api';
 import { courseApi } from '../lib/services';
+import { KEYS, LEVELS, courseListParams, normalizeCourseQuery, useInitialData } from '../lib/initialData';
 import useDebouncedValue from '../hooks/useDebouncedValue';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 import Icon from '../components/Icon';
@@ -9,7 +10,6 @@ import SearchBar from '../components/SearchBar';
 import FilterPanel from '../components/FilterPanel';
 import CourseGrid from '../components/CourseGrid';
 
-const LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
 const SORTS = [
   { value: 'newest', label: 'Newest' },
   { value: 'price_asc', label: 'Price: Low to High' },
@@ -20,17 +20,21 @@ export default function Courses() {
   useDocumentTitle('Explore courses');
   // Filters live in the URL so results are shareable and survive back/forward navigation.
   const [params, setParams] = useSearchParams();
-  const category = params.get('category') || '';
-  const level = LEVELS.includes(params.get('level')) ? params.get('level') : '';
-  const sort = SORTS.some((s) => s.value === params.get('sort')) ? params.get('sort') : 'newest';
+  const { category, level, sort } = normalizeCourseQuery(params);
 
   const [search, setSearch] = useState(() => params.get('q') || '');
   const query = useDebouncedValue(search.trim(), 300);
-  const [courses, setCourses] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  // First load can come from the SSR server (same normalised query → same key).
+  const [initialKey] = useState(() => `${KEYS.courseList(normalizeCourseQuery(params))}#0`);
+  const initialList = useInitialData(KEYS.courseList(normalizeCourseQuery(params)));
+  const initialCategories = useInitialData(KEYS.categories);
+  const [courses, setCourses] = useState(() => initialList?.value ?? []);
+  const [loading, setLoading] = useState(!initialList);
   const [error, setError] = useState('');
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState(() => initialCategories?.value ?? []);
   const [reload, setReload] = useState(0);
+  const skipKey = useRef(initialList ? initialKey : null);
 
   const setParam = useCallback((key, value) => {
     setParams((prev) => {
@@ -43,15 +47,17 @@ export default function Courses() {
   useEffect(() => { setParam('q', query); }, [query, setParam]);
 
   useEffect(() => {
+    if (initialCategories) return;
     courseApi.categories().then(setCategories).catch(() => setCategories([]));
-  }, []);
+  }, [initialCategories]);
 
   useEffect(() => {
+    if (skipKey.current === `${KEYS.courseList({ q: query, category, level, sort })}#${reload}`) return undefined;
     let active = true;
     setLoading(true);
     setError('');
     courseApi
-      .list({ search: query || undefined, category: category || undefined, level: level || undefined, sort })
+      .list(courseListParams({ q: query, category, level, sort }))
       .then((list) => { if (active) setCourses(list); })
       .catch((e) => { if (active) { setCourses([]); setError(errMsg(e)); } })
       .finally(() => { if (active) setLoading(false); });

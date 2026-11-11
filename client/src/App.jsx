@@ -25,6 +25,9 @@ function RouteFocus() {
   return null;
 }
 
+// Paths the SSR server renders; anything else is redirected to "/" (mirrors the catch-all route below).
+export const ROUTE_PATHS = ['/', '/about', '/auth', '/courses', '/courses/:id', '/dashboard', '/admin'];
+
 export default function App() {
   return (
     <>

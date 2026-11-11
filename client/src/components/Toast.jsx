@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from './Icon';
 
@@ -10,7 +10,9 @@ const DURATION = { success: 4500, info: 4500, error: 7000 };
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
+  const [mounted, setMounted] = useState(false);
   const seq = useRef(0);
+  useEffect(() => setMounted(true), []);
 
   const dismiss = useCallback((id) => setToasts((list) => list.filter((t) => t.id !== id)), []);
   const push = useCallback((type, message, title) => {
@@ -28,8 +30,8 @@ export function ToastProvider({ children }) {
   return (
     <ToastCtx.Provider value={value}>
       {children}
-      {/* Portalled outside #root so live regions keep announcing while a modal makes #root inert. */}
-      {createPortal(<ToastRegions toasts={toasts} onDismiss={dismiss} />, document.body)}
+      {/* Portalled outside #root (after mount, so SSR output stays identical) to keep live regions announcing while a modal makes #root inert. */}
+      {mounted && createPortal(<ToastRegions toasts={toasts} onDismiss={dismiss} />, document.body)}
     </ToastCtx.Provider>
   );
 }
