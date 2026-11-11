@@ -15,6 +15,7 @@ import EnrollmentCard from '../components/EnrollmentCard';
 import ConfirmModal from '../components/ConfirmModal';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import { CourseMedia } from '../components/CourseVisual';
+import { assignPhotos } from '../components/coursePhotos';
 import { Skeleton, SkeletonCards } from '../components/SkeletonLoader';
 
 const FILTERS = [
@@ -55,6 +56,8 @@ export default function Dashboard() {
     active: (items || []).filter((e) => e.status === 'active'),
     completed: (items || []).filter((e) => e.status === 'completed'),
   }), [items]);
+  // One distinct photo per enrolled course, stable across the status filters.
+  const photos = useMemo(() => assignPhotos((items || []).map((e) => e.course)), [items]);
   const total = items?.length ?? 0;
   const visible = filter === 'all' ? items || [] : filter === 'active' ? active : completed;
   const next = active[0];
@@ -145,7 +148,7 @@ export default function Dashboard() {
                   <Skeleton style={{ height: 160, borderRadius: 12 }} />
                 ) : next ? (
                   <article className="card continue-card" style={{ boxShadow: 'none' }}>
-                    <CourseMedia course={next.course} className="continue-media" />
+                    <CourseMedia course={next.course} className="continue-media" sizes="(min-width: 640px) 220px, 100vw" />
                     <div className="continue-body">
                       <StatusBadge status="active" />
                       <h3>{next.course.title}</h3>
@@ -195,7 +198,7 @@ export default function Dashboard() {
                 <ul className="enroll-list" role="list">
                   {visible.map((e) => (
                     <li key={e._id}>
-                      <EnrollmentCard enrollment={e} busy={pendingId === e._id} onComplete={markComplete} onRemove={setToRemove} />
+                      <EnrollmentCard enrollment={e} photo={photos[e.course._id]} busy={pendingId === e._id} onComplete={markComplete} onRemove={setToRemove} />
                     </li>
                   ))}
                 </ul>

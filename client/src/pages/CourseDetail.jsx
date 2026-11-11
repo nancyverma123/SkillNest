@@ -182,7 +182,7 @@ export default function CourseDetail() {
             </div>
 
             <aside className="card enroll-card" aria-label="Enrollment">
-              <CourseMedia course={c} className="enroll-media" priority />
+              <CourseMedia course={c} className="enroll-media" priority sizes="(min-width: 960px) 380px, 100vw" />
               <div className="enroll-body">
                 <div>
                   <p className="enroll-price-label">Course price</p>

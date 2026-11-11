@@ -5,11 +5,11 @@ import { Badge } from './StatusBadge';
 import { CourseMedia } from './CourseVisual';
 import { formatPrice } from '../lib/format';
 
-function CourseCard({ course: c, headingLevel = 3 }) {
+function CourseCard({ course: c, photo, headingLevel = 3 }) {
   const Heading = `h${headingLevel}`;
   return (
     <article className="card card-interactive course-card">
-      <CourseMedia course={c} className="course-card-media" />
+      <CourseMedia course={c} photo={photo} className="course-card-media" />
       <div className="course-card-body">
         <div className="course-card-top">
           <Badge tone="coral">{c.category}</Badge>

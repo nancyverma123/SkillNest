@@ -5,11 +5,11 @@ import StatusBadge from './StatusBadge';
 import { CourseMedia } from './CourseVisual';
 import { formatDate } from '../lib/format';
 
-function EnrollmentCard({ enrollment, busy, onComplete, onRemove }) {
+function EnrollmentCard({ enrollment, photo, busy, onComplete, onRemove }) {
   const { course: c, status } = enrollment;
   return (
     <article className="card enroll-item">
-      <CourseMedia course={c} className="enroll-item-media" />
+      <CourseMedia course={c} photo={photo} className="enroll-item-media" sizes="(min-width: 1280px) 33vw, (min-width: 720px) 50vw, 100vw" />
       <div className="enroll-item-body">
         <div className="enroll-item-top">
           <StatusBadge status={status} />
